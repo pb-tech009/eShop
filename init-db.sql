@@ -1,0 +1,4 @@
+CREATE DATABASE identitydb;
+CREATE DATABASE catalogdb;
+CREATE DATABASE orderingdb;
+CREATE DATABASE webhooksdb;
