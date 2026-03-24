@@ -90,14 +90,19 @@ public static class Extensions
             {
                 OnRedirectToIdentityProvider = context =>
                 {
-                    context.ProtocolMessage.IssuerAddress = context.ProtocolMessage.IssuerAddress
-                        .Replace("http://identity-api:8080", "http://localhost:5101");
+                    var original = context.ProtocolMessage.IssuerAddress;
+                    context.ProtocolMessage.IssuerAddress = original
+                        .Replace("identity-api:80", "localhost:5101")
+                        .Replace("identity-api", "localhost:5101");
+                    
+                    Console.WriteLine($"OIDC Redirect Rewrite: {original} -> {context.ProtocolMessage.IssuerAddress}");
                     return Task.CompletedTask;
                 },
                 OnRedirectToIdentityProviderForSignOut = context =>
                 {
                     context.ProtocolMessage.IssuerAddress = context.ProtocolMessage.IssuerAddress
-                        .Replace("http://identity-api:8080", "http://localhost:5101");
+                        .Replace("identity-api:80", "localhost:5101")
+                        .Replace("identity-api", "localhost:5101");
                     return Task.CompletedTask;
                 }
             };

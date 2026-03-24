@@ -26,26 +26,26 @@ services:
       context: .
       dockerfile: src/Identity.API/Dockerfile
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_ENVIRONMENT=Production
       - ConnectionStrings__identitydb=Host=postgres;Database=identitydb;Username=postgres;Password=password
-      - BasketApiClient=http://basket-api:8080
-      - OrderingApiClient=http://ordering-api:8080
-      - WebhooksApiClient=http://webhooks-api:8080
+      - BasketApiClient=http://basket-api:80
+      - OrderingApiClient=http://ordering-api:80
+      - WebhooksApiClient=http://webhooks-api:80
       - WebAppClient=http://localhost:5100
     depends_on:
       - postgres
     ports:
-      - "5101:8080"
+      - "5101:80"
 
   basket-api:
     build:
       context: .
       dockerfile: src/Basket.API/Dockerfile
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_ENVIRONMENT=Production
       - ConnectionStrings__redis=redis:6379
       - ConnectionStrings__eventbus=amqp://guest:guest@eventbus:5672
-      - Identity__Url=http://identity-api:8080
+      - Identity__Url=http://identity-api:80
     depends_on:
       - redis
       - eventbus
@@ -55,24 +55,24 @@ services:
       context: .
       dockerfile: src/Catalog.API/Dockerfile
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_ENVIRONMENT=Production
       - ConnectionStrings__catalogdb=Host=postgres;Database=catalogdb;Username=postgres;Password=password
       - ConnectionStrings__eventbus=amqp://guest:guest@eventbus:5672
     depends_on:
       - postgres
       - eventbus
     ports:
-      - "5102:8080"
+      - "5102:80"
 
   ordering-api:
     build:
       context: .
       dockerfile: src/Ordering.API/Dockerfile
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_ENVIRONMENT=Production
       - ConnectionStrings__orderingdb=Host=postgres;Database=orderingdb;Username=postgres;Password=password
       - ConnectionStrings__eventbus=amqp://guest:guest@eventbus:5672
-      - Identity__Url=http://identity-api:8080
+      - Identity__Url=http://identity-api:80
     depends_on:
       - postgres
       - eventbus
@@ -82,7 +82,7 @@ services:
       context: .
       dockerfile: src/OrderProcessor/Dockerfile
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_ENVIRONMENT=Production
       - ConnectionStrings__orderingdb=Host=postgres;Database=orderingdb;Username=postgres;Password=password
       - ConnectionStrings__eventbus=amqp://guest:guest@eventbus:5672
     depends_on:
@@ -95,7 +95,7 @@ services:
       context: .
       dockerfile: src/PaymentProcessor/Dockerfile
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_ENVIRONMENT=Production
       - ConnectionStrings__eventbus=amqp://guest:guest@eventbus:5672
     depends_on:
       - eventbus
@@ -105,10 +105,10 @@ services:
       context: .
       dockerfile: src/Webhooks.API/Dockerfile
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_ENVIRONMENT=Production
       - ConnectionStrings__webhooksdb=Host=postgres;Database=webhooksdb;Username=postgres;Password=password
       - ConnectionStrings__eventbus=amqp://guest:guest@eventbus:5672
-      - Identity__Url=http://identity-api:8080
+      - Identity__Url=http://identity-api:80
     depends_on:
       - postgres
       - eventbus
@@ -118,23 +118,23 @@ services:
       context: .
       dockerfile: src/WebApp/Dockerfile
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_ENVIRONMENT=Production
       - ConnectionStrings__eventbus=amqp://guest:guest@eventbus:5672
-      - services__basket-api__https__0=http://basket-api:8080
-      - services__basket-api__http__0=http://basket-api:8080
-      - services__catalog-api__https__0=http://catalog-api:8080
-      - services__catalog-api__http__0=http://catalog-api:8080
-      - services__ordering-api__https__0=http://ordering-api:8080
-      - services__ordering-api__http__0=http://ordering-api:8080
-      - services__identity-api__https__0=http://identity-api:8080
-      - services__identity-api__http__0=http://identity-api:8080
-      - BasketApiClient=http://basket-api:8080
-      - CatalogApiClient=http://catalog-api:8080
-      - OrderingApiClient=http://ordering-api:8080
-      - IdentityUrl=http://identity-api:8080
+      - services__basket-api__https__0=http://basket-api:80
+      - services__basket-api__http__0=http://basket-api:80
+      - services__catalog-api__https__0=http://catalog-api:80
+      - services__catalog-api__http__0=http://catalog-api:80
+      - services__ordering-api__https__0=http://ordering-api:80
+      - services__ordering-api__http__0=http://ordering-api:80
+      - services__identity-api__https__0=http://identity-api:80
+      - services__identity-api__http__0=http://identity-api:80
+      - BasketApiClient=http://basket-api:80
+      - CatalogApiClient=http://catalog-api:80
+      - OrderingApiClient=http://ordering-api:80
+      - IdentityUrl=http://identity-api:80
       - CallBackUrl=http://localhost:5100
     ports:
-      - "5100:8080"
+      - "5100:80"
     depends_on:
       - basket-api
       - catalog-api
