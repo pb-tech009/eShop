@@ -1,4 +1,4 @@
-﻿var builder = WebApplication.CreateBuilder(args);
+var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 
@@ -17,7 +17,12 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>()
 
 builder.Services.AddIdentityServer(options =>
 {
-    //options.IssuerUri = "null";
+    var issuerUri = builder.Configuration["IssuerUri"];
+    if (!string.IsNullOrEmpty(issuerUri))
+    {
+        options.IssuerUri = issuerUri;
+    }
+
     options.Authentication.CookieLifetime = TimeSpan.FromHours(2);
 
     options.Events.RaiseErrorEvents = true;
@@ -49,6 +54,7 @@ app.UseStaticFiles();
 // This cookie policy fixes login issues with Chrome 80+ using HTTP
 app.UseCookiePolicy(new CookiePolicyOptions { MinimumSameSitePolicy = SameSiteMode.Lax });
 app.UseRouting();
+
 app.UseIdentityServer();
 app.UseAuthorization();
 

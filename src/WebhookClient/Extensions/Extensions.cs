@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Server;
@@ -48,7 +48,16 @@ public static class Extensions
         .AddOpenIdConnect(options =>
         {
             options.SignInScheme = CookieAuthenticationDefaults.AuthenticationScheme;
-            options.Authority = identityUrl.ToString();
+            
+            var metadataAddress = configuration["Identity:MetadataAddress"];
+            var internalAuthority = metadataAddress?.Replace("/.well-known/openid-configuration", "");
+            options.Authority = !string.IsNullOrEmpty(internalAuthority) ? internalAuthority : identityUrl;
+
+            if (!string.IsNullOrEmpty(metadataAddress))
+            {
+                options.MetadataAddress = metadataAddress;
+            }
+
             options.SignedOutRedirectUri = callBackUrl.ToString();
             options.ClientId = "webhooksclient";
             options.ClientSecret = "secret";
@@ -58,6 +67,38 @@ public static class Extensions
             options.RequireHttpsMetadata = false;
             options.Scope.Add("openid");
             options.Scope.Add("webhooks");
+            options.TokenValidationParameters.ValidIssuer = identityUrl;
+            options.TokenValidationParameters.ValidateIssuer = true;
+
+            options.Events.OnRedirectToIdentityProvider = async context =>
+            {
+                var internalAuthority = context.Options.Authority;
+                var externalAuthority = identityUrl;
+
+                if (!string.IsNullOrEmpty(internalAuthority) && 
+                    !string.IsNullOrEmpty(externalAuthority) && 
+                    context.ProtocolMessage.IssuerAddress.StartsWith(internalAuthority))
+                {
+                    context.ProtocolMessage.IssuerAddress = context.ProtocolMessage.IssuerAddress
+                        .Replace(internalAuthority, externalAuthority);
+                }
+                await Task.CompletedTask;
+            };
+
+            options.Events.OnRedirectToIdentityProviderForSignOut = async context =>
+            {
+                var internalAuthority = context.Options.Authority;
+                var externalAuthority = identityUrl;
+
+                if (!string.IsNullOrEmpty(internalAuthority) && 
+                    !string.IsNullOrEmpty(externalAuthority) && 
+                    context.ProtocolMessage.IssuerAddress.StartsWith(internalAuthority))
+                {
+                    context.ProtocolMessage.IssuerAddress = context.ProtocolMessage.IssuerAddress
+                        .Replace(internalAuthority, externalAuthority);
+                }
+                await Task.CompletedTask;
+            };
         });
 
         services.AddScoped<AuthenticationStateProvider, ServerAuthenticationStateProvider>();

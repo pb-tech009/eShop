@@ -1,4 +1,4 @@
-﻿using eShop.Basket.API.Grpc;
+using eShop.Basket.API.Grpc;
 using eShop.WebApp.Services.OrderStatus.IntegrationEvents;
 using eShop.WebAppComponents.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -72,7 +72,16 @@ public static class Extensions
         .AddOpenIdConnect(options =>
         {
             options.SignInScheme = CookieAuthenticationDefaults.AuthenticationScheme;
-            options.Authority = identityUrl;
+            
+            var metadataAddress = configuration["Identity:MetadataAddress"];
+            var internalAuthority = metadataAddress?.Replace("/.well-known/openid-configuration", "");
+            options.Authority = !string.IsNullOrEmpty(internalAuthority) ? internalAuthority : identityUrl;
+
+            if (!string.IsNullOrEmpty(metadataAddress))
+            {
+                options.MetadataAddress = metadataAddress;
+            }
+
             options.SignedOutRedirectUri = callBackUrl;
             options.ClientId = "webapp";
             options.ClientSecret = "secret";
@@ -84,6 +93,40 @@ public static class Extensions
             options.Scope.Add("profile");
             options.Scope.Add("orders");
             options.Scope.Add("basket");
+            options.TokenValidationParameters.ValidIssuer = identityUrl;
+            options.TokenValidationParameters.ValidateIssuer = true;
+
+            options.Events.OnRedirectToIdentityProvider = async context =>
+            {
+                // Force the browser to use the public IdentityUrl (localhost:5001) 
+                // instead of the internal container name (identity-api:8080).
+                var internalAuthority = context.Options.Authority;
+                var externalAuthority = identityUrl;
+
+                if (!string.IsNullOrEmpty(internalAuthority) && 
+                    !string.IsNullOrEmpty(externalAuthority) && 
+                    context.ProtocolMessage.IssuerAddress.StartsWith(internalAuthority))
+                {
+                    context.ProtocolMessage.IssuerAddress = context.ProtocolMessage.IssuerAddress
+                        .Replace(internalAuthority, externalAuthority);
+                }
+                await Task.CompletedTask;
+            };
+
+            options.Events.OnRedirectToIdentityProviderForSignOut = async context =>
+            {
+                var internalAuthority = context.Options.Authority;
+                var externalAuthority = identityUrl;
+
+                if (!string.IsNullOrEmpty(internalAuthority) && 
+                    !string.IsNullOrEmpty(externalAuthority) && 
+                    context.ProtocolMessage.IssuerAddress.StartsWith(internalAuthority))
+                {
+                    context.ProtocolMessage.IssuerAddress = context.ProtocolMessage.IssuerAddress
+                        .Replace(internalAuthority, externalAuthority);
+                }
+                await Task.CompletedTask;
+            };
         });
 
         // Blazor auth services

@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.JsonWebTokens;
@@ -34,8 +34,13 @@ public static class AuthenticationExtensions
         {
             var identityUrl = identitySection.GetRequiredValue("Url");
             var audience = identitySection.GetRequiredValue("Audience");
+            var metadataAddress = identitySection["MetadataAddress"];
 
             options.Authority = identityUrl;
+            if (!string.IsNullOrEmpty(metadataAddress))
+            {
+                options.MetadataAddress = metadataAddress;
+            }
             options.RequireHttpsMetadata = false;
             options.Audience = audience;
             
