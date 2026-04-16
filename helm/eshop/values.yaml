@@ -15,7 +15,7 @@ infrastructure:
     persistence:
       enabled: true
       size: 1Gi
-      storageClassName: ""
+      storageClassName: "ebs-sc"  #gp2
   redis:
     enabled: true
     image: redis:alpine
@@ -23,15 +23,14 @@ infrastructure:
     persistence:
       enabled: true
       size: 1Gi
-      storageClassName: ""
+      storageClassName: "ebs-sc"
   rabbitmq:
     enabled: true
     image: rabbitmq:3-management-alpine
     persistence:
       enabled: true
       size: 1Gi
-      storageClassName: ""
-    ports:
+      storageClassName: "ebs-sc"   
       amqp: 5672
       management: 15672
 

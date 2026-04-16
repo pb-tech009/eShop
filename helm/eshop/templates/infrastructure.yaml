@@ -31,6 +31,8 @@ spec:
         env:
         - name: POSTGRES_PASSWORD
           value: {{ .Values.infrastructure.postgres.password | quote }}
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
         ports:
         - containerPort: 5432
           name: postgres
