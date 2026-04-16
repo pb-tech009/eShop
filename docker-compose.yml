@@ -1,0 +1,226 @@
+services:
+  # --- Infrastructure ---
+  postgres:
+    image: ankane/pgvector:latest
+    environment:
+      - POSTGRES_PASSWORD=postgres
+    ports:
+      - "5432:5432"
+    networks:
+      - eshop-network
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - eshop-network
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - eshop-network
+
+  # --- API Services ---
+  identity-api:
+    build:
+      context: .
+      dockerfile: src/Identity.API/Dockerfile
+    environment:
+      - ASPNETCORE_URLS=http://+:8080
+      - ASPNETCORE_HTTP_PORTS=8080
+      - ConnectionStrings__identitydb=Host=postgres;Database=identitydb;Username=postgres;Password=postgres
+      - ASPNETCORE_ENVIRONMENT=Development
+      - WebAppClient=http://localhost:5100
+      - WebhooksWebClient=http://localhost:5101
+      - BasketApiClient=http://localhost:5003
+      - OrderingApiClient=http://localhost:5004
+      - WebhooksApiClient=http://localhost:5005
+      - IssuerUri=http://localhost:5001
+    ports:
+      - "5001:8080"
+    depends_on:
+      - postgres
+    networks:
+      - eshop-network
+
+  catalog-api:
+    build:
+      context: .
+      dockerfile: src/Catalog.API/Dockerfile
+    environment:
+      - ASPNETCORE_URLS=http://+:8080
+      - ASPNETCORE_HTTP_PORTS=8080
+      - ConnectionStrings__catalogdb=Host=postgres;Database=catalogdb;Username=postgres;Password=postgres
+      - ConnectionStrings__eventbus=amqp://rabbitmq
+      - Identity__Url=http://localhost:5001
+      - Identity__MetadataAddress=http://identity-api:8080/.well-known/openid-configuration
+      - Identity__Audience=catalog
+      - Identity__Scopes__catalog=Catalog
+      - ASPNETCORE_ENVIRONMENT=Development
+    ports:
+      - "5002:8080"
+    depends_on:
+      - postgres
+      - rabbitmq
+    networks:
+      - eshop-network
+
+  basket-api:
+    build:
+      context: .
+      dockerfile: src/Basket.API/Dockerfile
+    environment:
+      - ASPNETCORE_URLS=http://+:8080
+      - ASPNETCORE_HTTP_PORTS=8080
+      - ConnectionStrings__redis=redis:6379
+      - ConnectionStrings__eventbus=amqp://rabbitmq
+      - Identity__Url=http://localhost:5001
+      - Identity__MetadataAddress=http://identity-api:8080/.well-known/openid-configuration
+      - Identity__Audience=basket
+      - Identity__Scopes__basket=Basket
+      - ASPNETCORE_ENVIRONMENT=Development
+    ports:
+      - "5003:8080"
+    depends_on:
+      - redis
+      - rabbitmq
+      - identity-api
+    networks:
+      - eshop-network
+
+  ordering-api:
+    build:
+      context: .
+      dockerfile: src/Ordering.API/Dockerfile
+    environment:
+      - ASPNETCORE_URLS=http://+:8080
+      - ASPNETCORE_HTTP_PORTS=8080
+      - ConnectionStrings__orderingdb=Host=postgres;Database=orderingdb;Username=postgres;Password=postgres
+      - ConnectionStrings__eventbus=amqp://rabbitmq
+      - Identity__Url=http://localhost:5001
+      - Identity__MetadataAddress=http://identity-api:8080/.well-known/openid-configuration
+      - Identity__Audience=orders
+      - Identity__Scopes__orders=Orders
+      - ASPNETCORE_ENVIRONMENT=Development
+    ports:
+      - "5004:8080"
+    depends_on:
+      - postgres
+      - rabbitmq
+      - identity-api
+    networks:
+      - eshop-network
+
+  webhooks-api:
+    build:
+      context: .
+      dockerfile: src/Webhooks.API/Dockerfile
+    environment:
+      - ASPNETCORE_URLS=http://+:8080
+      - ASPNETCORE_HTTP_PORTS=8080
+      - ConnectionStrings__webhooksdb=Host=postgres;Database=webhooksdb;Username=postgres;Password=postgres
+      - ConnectionStrings__eventbus=amqp://rabbitmq
+      - Identity__Url=http://localhost:5001
+      - Identity__MetadataAddress=http://identity-api:8080/.well-known/openid-configuration
+      - Identity__Audience=webhooks
+      - Identity__Scopes__webhooks=Webhooks
+      - ASPNETCORE_ENVIRONMENT=Development
+    ports:
+      - "5005:8080"
+    depends_on:
+      - postgres
+      - rabbitmq
+      - identity-api
+    networks:
+      - eshop-network
+
+  # --- Workers ---
+  order-processor:
+    build:
+      context: .
+      dockerfile: src/OrderProcessor/Dockerfile
+    environment:
+      - ASPNETCORE_URLS=http://+:8080
+      - ASPNETCORE_HTTP_PORTS=8080
+      - ConnectionStrings__orderingdb=Host=postgres;Database=orderingdb;Username=postgres;Password=postgres
+      - ConnectionStrings__eventbus=amqp://rabbitmq
+      - ASPNETCORE_ENVIRONMENT=Development
+    depends_on:
+      - postgres
+      - rabbitmq
+      - ordering-api
+    networks:
+      - eshop-network
+
+  payment-processor:
+    build:
+      context: .
+      dockerfile: src/PaymentProcessor/Dockerfile
+    environment:
+      - ASPNETCORE_URLS=http://+:8080
+      - ASPNETCORE_HTTP_PORTS=8080
+      - ConnectionStrings__eventbus=amqp://rabbitmq
+      - ASPNETCORE_ENVIRONMENT=Development
+    depends_on:
+      - rabbitmq
+    networks:
+      - eshop-network
+
+  # --- Apps ---
+  webapp:
+    build:
+      context: .
+      dockerfile: src/WebApp/Dockerfile
+    environment:
+      - ASPNETCORE_URLS=http://+:8080
+      - ASPNETCORE_HTTP_PORTS=8080
+      - ASPNETCORE_FORWARDEDHEADERS_ENABLED=true
+      - ConnectionStrings__basket-api=http://basket-api:8080
+      - ConnectionStrings__catalog-api=http://catalog-api:8080
+      - ConnectionStrings__ordering-api=http://ordering-api:8080
+      - services__catalog-api__http__0=http://catalog-api:8080
+      - services__basket-api__http__0=http://basket-api:8080
+      - services__ordering-api__http__0=http://ordering-api:8080
+      - ConnectionStrings__eventbus=amqp://rabbitmq
+      - IdentityUrl=http://localhost:5001
+      - Identity__MetadataAddress=http://identity-api:8080/.well-known/openid-configuration
+      - CallBackUrl=http://localhost:5100
+      - ASPNETCORE_ENVIRONMENT=Development
+    ports:
+      - "5100:8080"
+    depends_on:
+      - basket-api
+      - catalog-api
+      - ordering-api
+      - identity-api
+    networks:
+      - eshop-network
+
+  webhooks-client:
+    build:
+      context: .
+      dockerfile: src/WebhookClient/Dockerfile
+    environment:
+      - ASPNETCORE_URLS=http://+:8080
+      - ASPNETCORE_HTTP_PORTS=8080
+      - ConnectionStrings__webhooks-api=http://webhooks-api:8080
+      - services__webhooks-api__http__0=http://webhooks-api:8080
+      - IdentityUrl=http://localhost:5001
+      - Identity__MetadataAddress=http://identity-api:8080/.well-known/openid-configuration
+      - CallBackUrl=http://localhost:5101
+      - ASPNETCORE_ENVIRONMENT=Development
+    ports:
+      - "5101:8080"
+    depends_on:
+      - webhooks-api
+      - identity-api
+    networks:
+      - eshop-network
+
+networks:
+  eshop-network:
+    driver: bridge
