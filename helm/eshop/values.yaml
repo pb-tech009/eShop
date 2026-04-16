@@ -1,0 +1,166 @@
+# Global configuration
+global:
+  domain: localhost
+  registry: docker.io/parth1509
+  environment: Production
+  namespace: eshop
+
+# Infrastructure Services
+infrastructure:
+  postgres:
+    enabled: true
+    image: ankane/pgvector:latest
+    port: 5432
+    password: postgres
+    persistence:
+      enabled: true
+      size: 1Gi
+      storageClassName: ""
+  redis:
+    enabled: true
+    image: redis:alpine
+    port: 6379
+    persistence:
+      enabled: true
+      size: 1Gi
+      storageClassName: ""
+  rabbitmq:
+    enabled: true
+    image: rabbitmq:3-management-alpine
+    persistence:
+      enabled: true
+      size: 1Gi
+      storageClassName: ""
+    ports:
+      amqp: 5672
+      management: 15672
+
+# Microservices
+services:
+  identity-api:
+    enabled: true
+    image: eshop-identity-api
+    tag: latest
+    port: 8080
+    ingress:
+      enabled: true
+      hostname: identity
+    env:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__identitydb: "Host=postgres;Database=identitydb;Username=postgres;Password=postgres"
+      WebAppClient: "http://webapp.localhost"
+      WebhooksWebClient: "http://webhooks-client.localhost"
+      BasketApiClient: "http://basket-api"
+      OrderingApiClient: "http://ordering-api"
+      WebhooksApiClient: "http://webhooks-api"
+      IssuerUri: "http://identity.localhost"
+
+  catalog-api:
+    enabled: true
+    image: eshop-catalog-api
+    tag: latest
+    port: 8080
+    env:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__catalogdb: "Host=postgres;Database=catalogdb;Username=postgres;Password=postgres"
+      ConnectionStrings__eventbus: "amqp://rabbitmq"
+      Identity__Url: "http://identity.localhost"
+      Identity__MetadataAddress: "http://identity.localhost/.well-known/openid-configuration"
+      Identity__Audience: "catalog"
+      Identity__Scopes__catalog: "Catalog"
+
+  basket-api:
+    enabled: true
+    image: eshop-basket-api
+    tag: latest
+    port: 8080
+    env:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__redis: "redis:6379"
+      ConnectionStrings__eventbus: "amqp://rabbitmq"
+      Identity__Url: "http://identity.localhost"
+      Identity__MetadataAddress: "http://identity.localhost/.well-known/openid-configuration"
+      Identity__Audience: "basket"
+      Identity__Scopes__basket: "Basket"
+
+  ordering-api:
+    enabled: true
+    image: eshop-ordering-api
+    tag: latest
+    port: 8080
+    env:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__orderingdb: "Host=postgres;Database=orderingdb;Username=postgres;Password=postgres"
+      ConnectionStrings__eventbus: "amqp://rabbitmq"
+      Identity__Url: "http://identity.localhost"
+      Identity__MetadataAddress: "http://identity.localhost/.well-known/openid-configuration"
+      Identity__Audience: "orders"
+      Identity__Scopes__orders: "Orders"
+
+  webhooks-api:
+    enabled: true
+    image: eshop-webhooks-api
+    tag: latest
+    port: 8080
+    env:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__webhooksdb: "Host=postgres;Database=webhooksdb;Username=postgres;Password=postgres"
+      ConnectionStrings__eventbus: "amqp://rabbitmq"
+      Identity__Url: "http://identity.localhost"
+      Identity__MetadataAddress: "http://identity.localhost/.well-known/openid-configuration"
+      Identity__Audience: "webhooks"
+      Identity__Scopes__webhooks: "Webhooks"
+
+  order-processor:
+    enabled: true
+    image: eshop-order-processor
+    tag: latest
+    env:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__orderingdb: "Host=postgres;Database=orderingdb;Username=postgres;Password=postgres"
+      ConnectionStrings__eventbus: "amqp://rabbitmq"
+
+  payment-processor:
+    enabled: true
+    image: eshop-payment-processor
+    tag: latest
+    env:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__eventbus: "amqp://rabbitmq"
+
+  webapp:
+    enabled: true
+    image: eshop-webapp
+    tag: latest
+    port: 8080
+    ingress:
+      enabled: true
+      hostname: webapp
+    env:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__basket-api: "http://basket-api"
+      ConnectionStrings__catalog-api: "http://catalog-api"
+      ConnectionStrings__ordering-api: "http://ordering-api"
+      services__catalog-api__http__0: "http://catalog-api"
+      services__basket-api__http__0: "http://basket-api"
+      services__ordering-api__http__0: "http://ordering-api"
+      ConnectionStrings__eventbus: "amqp://rabbitmq"
+      IdentityUrl: "http://identity.localhost"
+      Identity__MetadataAddress: "http://identity.localhost/.well-known/openid-configuration"
+      CallBackUrl: "http://webapp.localhost"
+
+  webhooks-client:
+    enabled: true
+    image: eshop-webhooks-client
+    tag: latest
+    port: 8080
+    ingress:
+      enabled: true
+      hostname: webhooks-client
+    env:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__webhooks-api: "http://webhooks-api"
+      services__webhooks-api__http__0: "http://webhooks-api"
+      IdentityUrl: "http://identity.localhost"
+      Identity__MetadataAddress: "http://identity.localhost/.well-known/openid-configuration"
+      CallBackUrl: "http://webhooks-client.localhost"

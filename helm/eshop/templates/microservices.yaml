@@ -1,0 +1,94 @@
+{{- range $name, $config := .Values.services }}
+{{- if $config.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels:
+    app: {{ $name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ $name }}
+  template:
+    metadata:
+      labels:
+        app: {{ $name }}
+    spec:
+      initContainers:
+      # WAIT FOR POSTGRES
+      {{- if or (eq $name "catalog-api") (eq $name "identity-api") (eq $name "ordering-api") (eq $name "webhooks-api") }}
+      - name: wait-for-postgres
+        image: busybox:1.28
+        command: ['sh', '-c', "until nc -zv postgres 5432; do echo waiting for postgres; sleep 2; done"]
+      {{- end }}
+      # WAIT FOR RABBITMQ
+      {{- if or (eq $name "catalog-api") (eq $name "basket-api") (eq $name "ordering-api") (eq $name "webhooks-api") (eq $name "order-processor") (eq $name "payment-processor") (eq $name "webapp") (eq $name "webhooks-client") }}
+      - name: wait-for-rabbitmq
+        image: busybox:1.28
+        command: ['sh', '-c', "until nc -zv rabbitmq 5672; do echo waiting for rabbitmq; sleep 2; done"]
+      {{- end }}
+      # WAIT FOR IDENTITY API
+      {{- if or (eq $name "basket-api") (eq $name "ordering-api") (eq $name "webhooks-api") (eq $name "webapp") (eq $name "webhooks-client") }}
+      - name: wait-for-identity-api
+        image: busybox:1.28
+        command: ['sh', '-c', "until nc -zv identity-api 80; do echo waiting for identity-api; sleep 2; done"]
+      {{- end }}
+      containers:
+      - name: {{ $name }}
+        image: {{ $.Values.global.registry }}/{{ $config.image }}:{{ $config.tag }}
+        ports:
+        {{- if $config.port }}
+        - containerPort: {{ $config.port }}
+        {{- end }}
+        env:
+        - name: ASPNETCORE_FORWARDEDHEADERS_ENABLED
+          value: "true"
+        - name: ASPNETCORE_HTTP_PORTS
+          value: {{ default "8080" $config.port | quote }}
+        - name: ASPNETCORE_URLS
+          value: "http://+:{{ default "8080" $config.port }}"
+        {{- range $key, $val := $config.env }}
+        - name: {{ $key }}
+          value: {{ replace $val ".localhost" (printf ".%s" $.Values.global.domain) | quote }}
+        {{- end }}
+        {{- if $config.port }}
+        livenessProbe:
+          tcpSocket:
+            port: {{ $config.port }}
+          initialDelaySeconds: 60
+          periodSeconds: 20
+        readinessProbe:
+          tcpSocket:
+            port: {{ $config.port }}
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        {{- end }}
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+---
+{{- if $config.port }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  labels:
+    app: {{ $name }}
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: {{ $config.port }}
+    protocol: TCP
+  selector:
+    app: {{ $name }}
+{{- end }}
+{{- end }}
+{{- end }}
