@@ -52,7 +52,7 @@ spec:
           value: "http://+:{{ default "8080" $config.port }}"
         {{- range $key, $val := $config.env }}
         - name: {{ $key }}
-          value: {{ replace $val ".localhost" (printf ".%s" $.Values.global.domain) | quote }}
+          value: {{ replace ".localhost" (printf ".%s" $.Values.global.domain) $val | quote }}
         {{- end }}
         {{- if $config.port }}
         livenessProbe:
