@@ -2,10 +2,7 @@
 # KUBERNETES STORAGE CONFIGURATION
 # =============================================================================
 
-# Define the EBS CSI StorageClass and set it as default
-# This ensures that all infrastructure services (Postgres, Redis, RabbitMQ)
-# can automatically provision EBS volumes with the correct settings.
-
+# 1. નવી EBS SC બનાવો અને તેને Default સેટ કરો
 resource "kubernetes_storage_class_v1" "ebs_sc" {
   metadata {
     name = "ebs-sc"
@@ -28,13 +25,19 @@ resource "kubernetes_storage_class_v1" "ebs_sc" {
   depends_on = [module.retail_app_eks]
 }
 
-# Ensure the old gp2 storage class is not the default to prevent conflicts
-# Fixed for Windows PowerShell compatibility
-resource "null_resource" "remove_gp2_default" {
-  provisioner "local-exec" {
-    command     = "kubectl patch storageclass gp2 -p '{\"metadata\": {\"annotations\":{\"storageclass.kubernetes.io/is-default-class\":\"false\"}}}'"
-    interpreter = ["PowerShell", "-Command"]
+# 2. જૂની gp2 સ્ટોરેજ ક્લાસમાંથી Default ટેગ કાઢી નાખો (વગર કોઈ કમાન્ડ રન કર્યે)
+resource "kubernetes_annotations" "disable_gp2_default" {
+  api_version = "storage.k8s.io/v1"
+  kind        = "StorageClass"
+  metadata {
+    name = "gp2"
   }
 
-  depends_on = [module.retail_app_eks]
+  annotations = {
+    "storageclass.kubernetes.io/is-default-class" = "false"
+  }
+
+  force = true # આ ખૂબ મહત્વનું છે, તે જૂની વેલ્યુને ઓવરરાઈટ કરશે
+
+  depends_on = [kubernetes_storage_class_v1.ebs_sc]
 }
