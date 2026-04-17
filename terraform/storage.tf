@@ -29,9 +29,11 @@ resource "kubernetes_storage_class_v1" "ebs_sc" {
 }
 
 # Ensure the old gp2 storage class is not the default to prevent conflicts
+# Fixed for Windows PowerShell compatibility
 resource "null_resource" "remove_gp2_default" {
   provisioner "local-exec" {
-    command = "kubectl patch storageclass gp2 -p '{\"metadata\": {\"annotations\":{\"storageclass.kubernetes.io/is-default-class\":\"false\"}}}' || true"
+    command     = "kubectl patch storageclass gp2 -p '{\"metadata\": {\"annotations\":{\"storageclass.kubernetes.io/is-default-class\":\"false\"}}}'"
+    interpreter = ["PowerShell", "-Command"]
   }
 
   depends_on = [module.retail_app_eks]
